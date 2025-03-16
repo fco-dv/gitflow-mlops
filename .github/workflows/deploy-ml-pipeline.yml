@@ -1,14 +1,12 @@
 name: ML Pipeline Deployment
 
+# The workflow_call trigger is needed to make the workflow reusable
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*'
-  pull_request:
-    branches:
-      - main
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string  # Define environment as an input
 
 jobs:
   deploy-template:
@@ -35,31 +33,3 @@ jobs:
           echo "Model 'deployed' to ${{ matrix.environment }}"
           echo "Docker Image: my-ml-app:${{ matrix.environment == 'feature-branch' && github.sha || github.ref_name }}-${{ matrix.environment }}"
 
-  ephemeral-deploy:
-    name: Ephemeral Feature Deploy
-    if: github.event_name == 'pull_request'
-    uses: ./.github/workflows/deploy-ml-pipeline.yml
-    with:
-      environment: feature-branch
-
-  preprod-deploy:
-    name: Preprod/Latest Deploy
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: []
-    concurrency:
-      group: preprod-prod-deploy
-      cancel-in-progress: true
-    uses: ./.github/workflows/deploy-ml-pipeline.yml
-    with:
-      environment: preprod
-
-  prod-deploy:
-    name: Production Deploy
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: []
-    concurrency:
-      group: preprod-prod-deploy
-      cancel-in-progress: true
-    uses: ./.github/workflows/deploy-ml-pipeline.yml
-    with:
-      environment: prod
