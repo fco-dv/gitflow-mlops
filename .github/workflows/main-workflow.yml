@@ -11,7 +11,6 @@ on:
       - main
 
 jobs:
-
   ephemeral-deploy:
     name: Ephemeral Feature Deploy
     if: github.event_name == 'pull_request'

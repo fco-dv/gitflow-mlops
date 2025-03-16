@@ -32,4 +32,3 @@ jobs:
           echo "Simulating deployment to ${{ matrix.environment }}"
           echo "Model 'deployed' to ${{ matrix.environment }}"
           echo "Docker Image: my-ml-app:${{ matrix.environment == 'feature-branch' && github.sha || github.ref_name }}-${{ matrix.environment }}"
-
