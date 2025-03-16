@@ -12,4 +12,4 @@ ARG ENVIRONMENT
 ENV APP_ENV=$ENVIRONMENT
 
 # Command to run the application
-CMD ["echo", "APP_ENV is: $APP_ENV"]
+CMD ["echo", "APP_ENV is: $APP_ENV for model1"]
