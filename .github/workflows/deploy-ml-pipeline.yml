@@ -11,153 +11,56 @@ on:
       - 'v*'
 
 jobs:
-  ephemeral-deploy:
-    name: Ephemeral Feature Deploy
-    if: github.event_name == 'pull_request'
+  deploy-template:
     runs-on: ubuntu-latest
+    needs: []
+    strategy:
+      matrix:
+        environment: [feature-branch, preprod, prod]
     environment:
-      name: staging-feature-${{ github.head_ref }}
-      url: https://staging-feature.example.com
+      name: ${{ matrix.environment == 'feature-branch' && format('staging-feature-{0}', github.head_ref) || matrix.environment }}
+      url: ${{ matrix.environment == 'feature-branch' && 'https://staging-feature.example.com' || matrix.environment == 'preprod' && 'https://preprod.example.com' || 'https://production.example.com' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ matrix.environment == 'feature-branch' && github.head_ref || github.ref_name }}
       - name: Set Environment Variable
-        run: echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+        run: echo "ENVIRONMENT=${{ matrix.environment }}" >> $GITHUB_ENV
       - name: Build Docker Image
         run: |
-          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:${{ github.sha }}-staging .
-      - name: Simulate Ephemeral Deployment
+          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:${{ matrix.environment == 'feature-branch' && github.sha || github.ref_name }}-${{ matrix.environment }} .
+      - name: Simulate Deployment
         run: |
-          echo "Simulating ephemeral deployment for feature branch: ${{ github.head_ref }}"
-          echo "Model 'deployed' to staging-feature-${{ github.head_ref }}"
-          echo "Docker Image: my-ml-app:${{ github.sha }}-staging"
-      - name: Create or update deployment
-        uses: octokit/graphql-action@v2
-        with:
-          graphql: |
-            mutation createDeployment($repoOwner: String!, $repoName: String!, $refId: String!, $environmentName: String!, $description: String) {
-              createDeployment(input: {
-                repositoryId: "${{ github.repositoryId }}",
-                refId: $refId,
-                environment: $environmentName,
-                description: $description
-              }) {
-                deployment {
-                  id
-                }
-              }
-            }
-          variables: |
-            {
-              "repoOwner": "${{ github.repository_owner }}",
-              "repoName": "${{ github.event.repository.name }}",
-              "refId": "${{ github.sha }}",
-              "environmentName": "staging-feature-${{ github.head_ref }}",
-              "description": "Ephemeral deployment for feature branch ${{ github.head_ref }}"
-            }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "Simulating deployment to ${{ matrix.environment }}"
+          echo "Model 'deployed' to ${{ matrix.environment }}"
+          echo "Docker Image: my-ml-app:${{ matrix.environment == 'feature-branch' && github.sha || github.ref_name }}-${{ matrix.environment }}"
+
+  ephemeral-deploy:
+    name: Ephemeral Feature Deploy
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/deploy-ml-pipeline.yml#deploy-template
+    with:
+      environment: feature-branch
 
   preprod-deploy:
     name: Preprod/Latest Deploy
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment:
-      name: preprod
-      url: https://preprod.example.com
+    needs: []
     concurrency:
       group: preprod-prod-deploy
       cancel-in-progress: true
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Set Environment Variable
-        run: echo "ENVIRONMENT=preprod" >> $GITHUB_ENV
-      - name: Build Docker Image
-        run: |
-          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:latest-preprod .
-      - name: Simulate Preprod Deployment
-        run: |
-          echo "Simulating preprod deployment after merge to main"
-          echo "Model 'deployed' to preprod"
-          echo "Docker Image: my-ml-app:latest-preprod"
-      - name: Create or update deployment
-        uses: octokit/graphql-action@v2
-        with:
-          graphql: |
-            mutation createDeployment($repoOwner: String!, $repoName: String!, $refId: String!, $environmentName: String!, $description: String) {
-              createDeployment(input: {
-                repositoryId: "${{ github.repositoryId }}",
-                refId: $refId,
-                environment: $environmentName,
-                description: $description
-              }) {
-                deployment {
-                  id
-                }
-              }
-            }
-          variables: |
-            {
-              "repoOwner": "${{ github.repository_owner }}",
-              "repoName": "${{ github.event.repository.name }}",
-              "refId": "${{ github.sha }}",
-              "environmentName": "preprod",
-              "description": "Preprod deployment after merge to main"
-            }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: ./.github/workflows/deploy-ml-pipeline.yml#deploy-template
+    with:
+      environment: preprod
 
   prod-deploy:
     name: Production Deploy
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: https://production.example.com
+    needs: []
     concurrency:
       group: preprod-prod-deploy
       cancel-in-progress: true
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.ref_name }}
-      - name: Set Environment Variable
-        run: echo "ENVIRONMENT=production" >> $GITHUB_ENV
-      - name: Build Docker Image
-        run: |
-          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:${{ github.ref_name }}-prod .
-      - name: Simulate Production Deployment
-        run: |
-          echo "Simulating production deployment for tag: ${{ github.ref_name }}"
-          echo "Model 'deployed' to production"
-          echo "Docker Image: my-ml-app:${{ github.ref_name }}-prod"
-      - name: Create or update deployment
-        uses: octokit/graphql-action@v2
-        with:
-          graphql: |
-            mutation createDeployment($repoOwner: String!, $repoName: String!, $refId: String!, $environmentName: String!, $description: String) {
-              createDeployment(input: {
-                repositoryId: "${{ github.repositoryId }}",
-                refId: $refId,
-                environment: $environmentName,
-                description: $description
-              }) {
-                deployment {
-                  id
-                }
-              }
-            }
-          variables: |
-            {
-              "repoOwner": "${{ github.repository_owner }}",
-              "repoName": "${{ github.event.repository.name }}",
-              "refId": "${{ github.ref_name }}",
-              "environmentName": "production",
-              "description": "Production deployment for tag ${{ github.ref_name }}"
-            }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: ./.github/workflows/deploy-ml-pipeline.yml#deploy-template
+    with:
+      environment: prod
