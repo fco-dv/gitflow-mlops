@@ -33,11 +33,32 @@ jobs:
           echo "Simulating ephemeral deployment for feature branch: ${{ github.head_ref }}"
           echo "Model 'deployed' to staging-feature-${{ github.head_ref }}"
           echo "Docker Image: my-ml-app:${{ github.sha }}-staging"
-      - name: Set deployment status
-        uses: peter-evans/create-or-update-deployment@v4
+      - name: Create or update deployment
+        uses: octokit/graphql-action@v2
         with:
-          environment: staging-feature-${{ github.head_ref }}
-          state: 'success'
+          graphql: |
+            mutation createDeployment($repoOwner: String!, $repoName: String!, $refId: String!, $environmentName: String!, $description: String) {
+              createDeployment(input: {
+                repositoryId: "${{ github.repositoryId }}",
+                refId: $refId,
+                environment: $environmentName,
+                description: $description
+              }) {
+                deployment {
+                  id
+                }
+              }
+            }
+          variables: |
+            {
+              "repoOwner": "${{ github.repository_owner }}",
+              "repoName": "${{ github.event.repository.name }}",
+              "refId": "${{ github.sha }}",
+              "environmentName": "staging-feature-${{ github.head_ref }}",
+              "description": "Ephemeral deployment for feature branch ${{ github.head_ref }}"
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   preprod-deploy:
     name: Preprod/Latest Deploy
@@ -62,11 +83,32 @@ jobs:
           echo "Simulating preprod deployment after merge to main"
           echo "Model 'deployed' to preprod"
           echo "Docker Image: my-ml-app:latest-preprod"
-      - name: Set deployment status
-        uses: peter-evans/create-or-update-deployment@v4
+      - name: Create or update deployment
+        uses: octokit/graphql-action@v2
         with:
-          environment: preprod
-          state: 'success'
+          graphql: |
+            mutation createDeployment($repoOwner: String!, $repoName: String!, $refId: String!, $environmentName: String!, $description: String) {
+              createDeployment(input: {
+                repositoryId: "${{ github.repositoryId }}",
+                refId: $refId,
+                environment: $environmentName,
+                description: $description
+              }) {
+                deployment {
+                  id
+                }
+              }
+            }
+          variables: |
+            {
+              "repoOwner": "${{ github.repository_owner }}",
+              "repoName": "${{ github.event.repository.name }}",
+              "refId": "${{ github.sha }}",
+              "environmentName": "preprod",
+              "description": "Preprod deployment after merge to main"
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   prod-deploy:
     name: Production Deploy
@@ -93,8 +135,29 @@ jobs:
           echo "Simulating production deployment for tag: ${{ github.ref_name }}"
           echo "Model 'deployed' to production"
           echo "Docker Image: my-ml-app:${{ github.ref_name }}-prod"
-      - name: Set deployment status
-        uses: peter-evans/create-or-update-deployment@v4
+      - name: Create or update deployment
+        uses: octokit/graphql-action@v2
         with:
-          environment: production
-          state: 'success'
+          graphql: |
+            mutation createDeployment($repoOwner: String!, $repoName: String!, $refId: String!, $environmentName: String!, $description: String) {
+              createDeployment(input: {
+                repositoryId: "${{ github.repositoryId }}",
+                refId: $refId,
+                environment: $environmentName,
+                description: $description
+              }) {
+                deployment {
+                  id
+                }
+              }
+            }
+          variables: |
+            {
+              "repoOwner": "${{ github.repository_owner }}",
+              "repoName": "${{ github.event.repository.name }}",
+              "refId": "${{ github.ref_name }}",
+              "environmentName": "production",
+              "description": "Production deployment for tag ${{ github.ref_name }}"
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
