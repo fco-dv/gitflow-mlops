@@ -1,0 +1,100 @@
+name: ML Pipeline Deployment
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+  ephemeral-deploy:
+    name: Ephemeral Feature Deploy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging-feature-${{ github.head_ref }}
+      url: https://staging-feature.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Set Environment Variable
+        run: echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+      - name: Build Docker Image
+        run: |
+          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:${{ github.sha }}-staging .
+      - name: Simulate Ephemeral Deployment
+        run: |
+          echo "Simulating ephemeral deployment for feature branch: ${{ github.head_ref }}"
+          echo "Model 'deployed' to staging-feature-${{ github.head_ref }}"
+          echo "Docker Image: my-ml-app:${{ github.sha }}-staging"
+      - name: Set deployment status
+        uses: peter-evans/create-or-update-deployment@v4
+        with:
+          environment: staging-feature-${{ github.head_ref }}
+          state: 'success'
+
+  preprod-deploy:
+    name: Preprod/Latest Deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: preprod
+      url: https://preprod.example.com
+    concurrency:
+      group: preprod-prod-deploy
+      cancel-in-progress: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set Environment Variable
+        run: echo "ENVIRONMENT=preprod" >> $GITHUB_ENV
+      - name: Build Docker Image
+        run: |
+          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:latest-preprod .
+      - name: Simulate Preprod Deployment
+        run: |
+          echo "Simulating preprod deployment after merge to main"
+          echo "Model 'deployed' to preprod"
+          echo "Docker Image: my-ml-app:latest-preprod"
+      - name: Set deployment status
+        uses: peter-evans/create-or-update-deployment@v4
+        with:
+          environment: preprod
+          state: 'success'
+
+  prod-deploy:
+    name: Production Deploy
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://production.example.com
+    concurrency:
+      group: preprod-prod-deploy
+      cancel-in-progress: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Set Environment Variable
+        run: echo "ENVIRONMENT=production" >> $GITHUB_ENV
+      - name: Build Docker Image
+        run: |
+          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:${{ github.ref_name }}-prod .
+      - name: Simulate Production Deployment
+        run: |
+          echo "Simulating production deployment for tag: ${{ github.ref_name }}"
+          echo "Model 'deployed' to production"
+          echo "Docker Image: my-ml-app:${{ github.ref_name }}-prod"
+      - name: Set deployment status
+        uses: peter-evans/create-or-update-deployment@v4
+        with:
+          environment: production
+          state: 'success'
