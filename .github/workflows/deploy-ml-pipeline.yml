@@ -50,7 +50,7 @@ jobs:
   ephemeral-deploy:
     name: Ephemeral Feature Deploy
     if: github.event_name == 'pull_request'
-    uses: ./.github/workflows/deploy-ml-pipeline.yml#deploy-template
+    uses: ./.github/workflows/deploy-ml-pipeline.yml  # Correctly refer to the workflow file
     with:
       environment: feature-branch
 
@@ -61,7 +61,7 @@ jobs:
     concurrency:
       group: preprod-prod-deploy
       cancel-in-progress: true
-    uses: ./.github/workflows/deploy-ml-pipeline.yml#deploy-template
+    uses: ./.github/workflows/deploy-ml-pipeline.yml  # Correctly refer to the workflow file
     with:
       environment: preprod
 
@@ -72,6 +72,6 @@ jobs:
     concurrency:
       group: preprod-prod-deploy
       cancel-in-progress: true
-    uses: ./.github/workflows/deploy-ml-pipeline.yml#deploy-template
+    uses: ./.github/workflows/deploy-ml-pipeline.yml  # Correctly refer to the workflow file
     with:
       environment: prod
