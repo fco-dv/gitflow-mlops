@@ -11,74 +11,75 @@ on:
       - main
 
 jobs:
-  deploy-template: # This is now internal
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment: [feature-branch, preprod, prod]
-    environment:
-      name: ${{ matrix.environment == 'feature-branch' && format('staging-feature-{0}', github.head_ref) || matrix.environment }}
-      url: ${{ matrix.environment == 'feature-branch' && 'https://staging-feature.example.com' || matrix.environment == 'preprod' && 'https://preprod.example.com' || 'https://production.example.com' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ matrix.environment == 'feature-branch' && github.head_ref || github.ref_name }}
-      - name: Set Environment Variable
-        run: echo "ENVIRONMENT=${{ matrix.environment }}" >> $GITHUB_ENV
-      - name: Build Docker Image
-        run: |
-          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:${{ matrix.environment == 'feature-branch' && github.sha || github.ref_name }}-${{ matrix.environment }} .
-      - name: Simulate Deployment
-        run: |
-          echo "Simulating deployment to ${{ matrix.environment }}"
-          echo "Model 'deployed' to ${{ matrix.environment }}"
-          echo "Docker Image: my-ml-app:${{ matrix.environment == 'feature-branch' && github.sha || github.ref_name }}-${{ matrix.environment }}"
-
   ephemeral-deploy:
     name: Ephemeral Feature Deploy
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    needs: [deploy-template] # Depend on deploy-template
-    strategy:
-      matrix:
-        environment: [feature-branch] # Only run for feature-branch
+    environment:
+      name: staging-feature-${{ github.head_ref }}
+      url: https://staging-feature.example.com
     steps:
-      - name: Call deploy-template
-        uses: ./.github/workflows/combined-workflow.yml#deploy-template
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
-          environment: feature-branch
+          ref: ${{ github.head_ref }}
+      - name: Set Environment Variable
+        run: echo "ENVIRONMENT=feature-branch" >> $GITHUB_ENV
+      - name: Build Docker Image
+        run: |
+          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:${{ github.sha }}-feature-branch .
+      - name: Simulate Deployment
+        run: |
+          echo "Simulating deployment to staging-feature-${{ github.head_ref }}"
+          echo "Model 'deployed' to staging-feature-${{ github.head_ref }}"
+          echo "Docker Image: my-ml-app:${{ github.sha }}-feature-branch"
 
   preprod-deploy:
     name: Preprod/Latest Deploy
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [deploy-template] # Depend on deploy-template
+    runs-on: ubuntu-latest
+    environment:
+      name: preprod
+      url: https://preprod.example.com
     concurrency:
       group: preprod-prod-deploy
       cancel-in-progress: true
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment: [preprod] # Only run for preprod
     steps:
-      - name: Call deploy-template
-        uses: ./.github/workflows/combined-workflow.yml#deploy-template
-        with:
-          environment: preprod
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set Environment Variable
+        run: echo "ENVIRONMENT=preprod" >> $GITHUB_ENV
+      - name: Build Docker Image
+        run: |
+          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:latest-preprod .
+      - name: Simulate Deployment
+        run: |
+          echo "Simulating deployment to preprod"
+          echo "Model 'deployed' to preprod"
+          echo "Docker Image: my-ml-app:latest-preprod"
 
   prod-deploy:
     name: Production Deploy
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: [deploy-template] # Depend on deploy-template
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://production.example.com
     concurrency:
       group: preprod-prod-deploy
       cancel-in-progress: true
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment: [prod] # Only run for prod
     steps:
-      - name: Call deploy-template
-        uses: ./.github/workflows/combined-workflow.yml#deploy-template
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
-          environment: prod
+          ref: ${{ github.ref_name }}
+      - name: Set Environment Variable
+        run: echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+      - name: Build Docker Image
+        run: |
+          docker build --build-arg ENVIRONMENT=${{ env.ENVIRONMENT }} -t my-ml-app:${{ github.ref_name }}-prod .
+      - name: Simulate Deployment
+        run: |
+          echo "Simulating deployment to production"
+          echo "Model 'deployed' to production"
+          echo "Docker Image: my-ml-app:${{ github.ref_name }}-prod"
